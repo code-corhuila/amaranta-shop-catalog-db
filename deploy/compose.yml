@@ -1,0 +1,33 @@
+# The migration runner of the catalog domain (Annex J, J.7). There is no database service and no volume
+# here: the single MongoDB instance lives in amaranta-shop-infra-mongo, which includes this file.
+#
+# From amaranta-shop-infra-mongo, with the instance up:
+#   docker compose --env-file env/dev.env run --rm catalog-db-migrate
+# The runner connects as the administrator of the instance, because it creates the collections and the
+# roles; the service never does. The control tables are named for this domain (Annex J, J.6).
+name: amaranta-shop-catalog-db
+
+services:
+  catalog-db-migrate:
+    build:
+      context: .
+      dockerfile: liquibase.Dockerfile
+    profiles: [tooling]
+    volumes:
+      - ../:/workspace:ro
+    environment:
+      LIQUIBASE_COMMAND_USERNAME: ${MONGO_ADMIN_USER:?set MONGO_ADMIN_USER in the environment file}
+      LIQUIBASE_COMMAND_PASSWORD: ${MONGO_ADMIN_PASSWORD:?set MONGO_ADMIN_PASSWORD in the environment file}
+    entrypoint: ["liquibase",
+      "--search-path=/workspace",
+      "--changelog-file=changelog/changelog-master.yaml",
+      "--database-changelog-table-name=databasechangelog_catalog",
+      "--database-changelog-lock-table-name=databasechangeloglock_catalog",
+      "--url=mongodb://mongo:27017/catalog?authSource=admin"]
+    command: ["update"]
+    networks: [platform]
+
+networks:
+  platform:
+    name: platform
+    external: true
