@@ -1,0 +1,43 @@
+databaseChangeLog:
+  - changeSet:
+      id: ddl-indexes-001
+      author: BrandowC
+      labels: "catalog,ddl,indexes"
+      comment: "sku is unique: in MongoDB that is structure, not optimization. createIndex with the same name and keys is a no-op, so it is idempotent."
+      changes:
+        - createIndex:
+            collectionName: product
+            keys: '{ "sku": 1 }'
+            options: '{ "name": "idx_product_sku", "unique": true }'
+      rollback:
+        - dropIndex:
+            collectionName: product
+            keys: '{ "sku": 1 }'
+  - changeSet:
+      id: ddl-indexes-002
+      author: BrandowC
+      labels: "catalog,ddl,indexes"
+      comment: "The product list: filter by category among the active products."
+      changes:
+        - createIndex:
+            collectionName: product
+            keys: '{ "category": 1, "isActive": 1 }'
+            options: '{ "name": "idx_product_category_is_active" }'
+      rollback:
+        - dropIndex:
+            collectionName: product
+            keys: '{ "category": 1, "isActive": 1 }'
+  - changeSet:
+      id: ddl-indexes-003
+      author: BrandowC
+      labels: "catalog,ddl,indexes"
+      comment: "The name search of the catalog page."
+      changes:
+        - createIndex:
+            collectionName: product
+            keys: '{ "name": 1 }'
+            options: '{ "name": "idx_product_name" }'
+      rollback:
+        - dropIndex:
+            collectionName: product
+            keys: '{ "name": 1 }'
