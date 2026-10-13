@@ -80,6 +80,15 @@ must send a `long` (in Python, `bson.Int64`). The validator is also the last def
 that would leave it below zero is refused even if the service forgot its own condition. Indexes:
 `idx_product_sku` (unique), `idx_product_category_is_active` (the list) and `idx_product_name` (the search).
 
+## The seed
+
+`dml-inserts-001` brings the ten products of the monolith. Their names, prices and **initial** stock are those of
+the monolith's seed (`V005`); their ids are the ones its database issued on 2026-10-13, read from the running
+instance, because the monolith generates them at random: a different database has different ids, and its orders
+must be re-pointed by `sku` before the cutover. The seed is an upsert with `$setOnInsert`, so it creates what is
+missing and **never touches a product that exists**: running it again cannot reset a live stock (the check proves
+it). The live stock is carried over at the cutover as a patch in `02_dml/04_patches`, not here.
+
 ## How to run
 
 ```bash
@@ -102,6 +111,5 @@ behind and the chain applies again.
 
 ## Status
 
-The `product` collection, its validator and its indexes, proved on every pull request. Next, each its own pull
-request: `feat/catalog-seed-products` (the ten products, with their ids) and `feat/catalog-roles`
-(`catalog_reader`, `catalog_writer` and the grant to `catalog_app`).
+The `product` collection, its validator, its indexes and the seed. Next: `feat/catalog-roles` (`catalog_reader`,
+`catalog_writer` and the grant to `catalog_app`).
