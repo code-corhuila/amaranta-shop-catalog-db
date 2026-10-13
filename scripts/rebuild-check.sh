@@ -9,7 +9,8 @@
 #   2. a second update applies nothing;
 #   3. the validator rejects what it must reject and accepts what it must accept;
 #   4. the seed leaves the ten products, under the ids the monolith issued;
-#   5. the inline rollbacks leave no collection behind, and the chain applies again.
+#   5. catalog_app, the service's user, can only do what the service needs, and catalog_reader only reads;
+#   6. the inline rollbacks leave no collection behind, and the chain applies again.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export MSYS_NO_PATHCONV=1   # Git Bash on Windows must not rewrite the container paths below
@@ -73,7 +74,17 @@ lb update
 [ "$(mongo_admin --eval "db.getSiblingDB('catalog').product.findOne({ sku: 'FOOD-001' }).stockQuantity.toString()")" = "7" ] \
   || fail "applying the seed again reset a live stock"
 
-echo "== 5. every rollback, then the chain again"
+echo "== 5. catalog_app writes only in its database, and only what the service needs"
+mongo_as() { docker exec -i "$NAME" mongosh --quiet -u "$1" -p "$2" --authenticationDatabase catalog --file /dev/stdin; }
+[ "$(mongo_admin --eval "JSON.stringify(db.getSiblingDB('catalog').getUser('catalog_app').roles)")" = '[{"role":"catalog_writer","db":"catalog"}]' ] \
+  || fail "catalog_app must hold catalog_writer and nothing else"
+mongo_as catalog_app "$APP_PW" < test/privileges.js
+READER_PW="$(openssl rand -hex 16)"
+mongo_admin --eval "db.getSiblingDB('catalog').createUser({ user: 'tmp_reader', pwd: '$READER_PW', roles: [{ role: 'catalog_reader', db: 'catalog' }] })" > /dev/null
+mongo_as tmp_reader "$READER_PW" < test/reader.js
+mongo_admin --eval "db.getSiblingDB('catalog').dropUser('tmp_reader')" > /dev/null
+
+echo "== 6. every rollback, then the chain again"
 lb rollback-count --count=999
 [ "$(has_collection product)" = "false" ] || fail "the rollbacks left the product collection behind"
 lb update
