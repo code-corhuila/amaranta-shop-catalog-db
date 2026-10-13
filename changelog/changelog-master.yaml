@@ -1,0 +1,12 @@
+# The only entry point: Liquibase runs what this file includes, in this order. A file that is not
+# included here does not exist.
+databaseChangeLog:
+  - include:
+      file: ../01_ddl/changelog.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: ../02_dml/changelog.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: ../03_dcl/changelog.yaml
+      relativeToChangelogFile: true
