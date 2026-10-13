@@ -1,0 +1,53 @@
+name: Database rebuild
+
+# The whole migration chain must build the collections from an EMPTY database, the validator must refuse
+# what the service must never store, every rollback must undo the chain, and the chain must apply again.
+# If the only place the structure works is where it was patched by hand, the next environment cannot exist.
+# The check itself is scripts/rebuild-check.sh, so a red pull request can be reproduced locally.
+
+on:
+  pull_request:
+    branches: [develop, qa, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The repository has its minimum content
+        run: |
+          for file in README.md .github/CODEOWNERS .gitignore .env.example \
+                      changelog/changelog-master.yaml deploy/compose.yml deploy/liquibase.Dockerfile; do
+            [ -f "$file" ] || { echo "missing $file"; exit 1; }
+          done
+
+      - name: No real environment file or key is versioned
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$|\.pem$|(^|/)keys/'; then
+            echo "A real environment file or key is versioned"
+            exit 1
+          fi
+
+      - name: This database defines no database service and no volume (Annex J, J.10)
+        run: |
+          if grep -nE '^volumes:|image: *mongo' deploy/compose.yml; then
+            echo "deploy/compose.yml must hold only the migration runner"
+            exit 1
+          fi
+
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, validate, roll back and rebuild
+        run: bash scripts/rebuild-check.sh

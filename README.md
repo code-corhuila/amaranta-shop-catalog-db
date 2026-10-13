@@ -52,6 +52,7 @@ changelog/changelog-master.yaml   the only entry point: it includes the three fa
 02_dml/                           data: seeds, updates, upserts, patches
 03_dcl/                           the domain's roles
 deploy/                           the migration runner (Dockerfile + compose): no database, no volume
+scripts/rebuild-check.sh          the rebuild check; test/validator.js holds what the validator must refuse
 ```
 
 There is no `04_alter`, `04_tcl` or `05_rollbacks`: MongoDB has no foreign keys, and each changeset declares
@@ -92,9 +93,15 @@ It works once the infra repository `include`s `deploy/compose.yml` (a line to ad
 administrator of the instance; the service never does. Liquibase keeps its control collections named for this
 domain (`databasechangelog_catalog`, Annex J, J.6). In `qa` and `main` never `docker compose down -v`.
 
+## The rebuild check
+
+`bash scripts/rebuild-check.sh` needs only Docker and is what the pull request runs. On a throwaway MongoDB it
+proves that `update` builds the collection from empty, that a second `update` applies nothing, that the
+validator refuses and accepts what it must, that the indexes exist, and that the rollbacks leave no collection
+behind and the chain applies again.
+
 ## Status
 
-The `product` collection, its validator and its indexes. Next, each its own pull request:
-`chore/catalog-rebuild-check` (the check that proves all of this on every pull request),
-`feat/catalog-seed-products` (the ten products, with their ids) and `feat/catalog-roles` (`catalog_reader`,
-`catalog_writer` and the grant to `catalog_app`).
+The `product` collection, its validator and its indexes, proved on every pull request. Next, each its own pull
+request: `feat/catalog-seed-products` (the ten products, with their ids) and `feat/catalog-roles`
+(`catalog_reader`, `catalog_writer` and the grant to `catalog_app`).
