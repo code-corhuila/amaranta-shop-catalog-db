@@ -89,6 +89,17 @@ must be re-pointed by `sku` before the cutover. The seed is an upsert with `$set
 missing and **never touches a product that exists**: running it again cannot reset a live stock (the check proves
 it). The live stock is carried over at the cutover as a patch in `02_dml/04_patches`, not here.
 
+## Roles and grants
+
+`catalog_reader` (read) and `catalog_writer` (read, insert, update, remove) are custom roles scoped to the
+`product` collection, not to the whole database: the control collections live in the same database and the
+service must not reach them. `dcl-roles-003` grants `catalog_writer` to `catalog_app` and takes back the built-in
+`readWrite` the instance gave it, because that one also allows dropping collections and creating indexes. So the
+service can read, insert, reserve (update) and remove a product, and cannot create a collection or an index,
+weaken the validator, read the migration history or touch another database. MongoDB has no `CREATE ROLE IF NOT
+EXISTS`, so the two role changesets ignore "already exists" and nothing else. `test/privileges.js` logs in **as
+`catalog_app`** and proves all of it, `test/reader.js` does the same for the reader (Annex J, J.10).
+
 ## How to run
 
 ```bash
@@ -111,5 +122,6 @@ behind and the chain applies again.
 
 ## Status
 
-The `product` collection, its validator, its indexes and the seed. Next: `feat/catalog-roles` (`catalog_reader`,
-`catalog_writer` and the grant to `catalog_app`).
+Complete for the catalog: collection, validator, indexes, seed, roles and grants. A change to any of them is a
+new changeset with its inverse. Next in the system: `amaranta-shop-catalog-api` connects as `catalog_app` and
+its integration tests run against this database.
