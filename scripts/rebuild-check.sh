@@ -8,7 +8,8 @@
 #   1. update builds the collection, its validator and its indexes from an EMPTY database;
 #   2. a second update applies nothing;
 #   3. the validator rejects what it must reject and accepts what it must accept;
-#   4. the inline rollbacks leave no collection behind, and the chain applies again.
+#   4. the seed leaves the ten products, under the ids the monolith issued;
+#   5. the inline rollbacks leave no collection behind, and the chain applies again.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export MSYS_NO_PATHCONV=1   # Git Bash on Windows must not rewrite the container paths below
@@ -63,7 +64,16 @@ lb update
 echo "== 3. the validator and the indexes"
 mongo_admin --file /dev/stdin < test/validator.js
 
-echo "== 4. every rollback, then the chain again"
+echo "== 4. the seed: the ten products, under the ids the monolith issued"
+mongo_admin --file /dev/stdin < test/seed.js
+# Applying the seed again (as after a half-failed run) must create what is missing and touch nothing else:
+# a live stock cannot be reset to the seed's.
+mongo_admin --eval "const c = db.getSiblingDB('catalog'); c.product.updateOne({ sku: 'FOOD-001' }, { \$set: { stockQuantity: Long('7') } }); c.databasechangelog_catalog.deleteOne({ id: 'dml-inserts-001' })" > /dev/null
+lb update
+[ "$(mongo_admin --eval "db.getSiblingDB('catalog').product.findOne({ sku: 'FOOD-001' }).stockQuantity.toString()")" = "7" ] \
+  || fail "applying the seed again reset a live stock"
+
+echo "== 5. every rollback, then the chain again"
 lb rollback-count --count=999
 [ "$(has_collection product)" = "false" ] || fail "the rollbacks left the product collection behind"
 lb update
