@@ -1,0 +1,50 @@
+# Roles only. Login users and their passwords are created by the infrastructure from secrets, never here.
+# Privileges are scoped to the product collection, not to the whole database: the migration control
+# collections live in the same database and the service must not reach them.
+databaseChangeLog:
+  - changeSet:
+      id: dcl-roles-001
+      author: BrandowC
+      labels: "catalog,dcl,roles"
+      comment: "catalog_reader: reads products and nothing else. failOnError is off because MongoDB has no CREATE ROLE IF NOT EXISTS: a role that exists already is the idempotent outcome."
+      failOnError: false
+      changes:
+        - runCommand:
+            command: |
+              { "createRole": "catalog_reader",
+                "privileges": [ { "resource": { "db": "catalog", "collection": "product" }, "actions": ["find"] } ],
+                "roles": [] }
+      rollback:
+        - runCommand:
+            command: '{ "dropRole": "catalog_reader" }'
+  - changeSet:
+      id: dcl-roles-002
+      author: BrandowC
+      labels: "catalog,dcl,roles"
+      comment: "catalog_writer: what the service does to a product. It can remove one (the admin deletes products; past orders keep their own copy of the name and price), but it cannot create or drop a collection or an index, or change the validator: structure belongs to this repository."
+      failOnError: false
+      changes:
+        - runCommand:
+            command: |
+              { "createRole": "catalog_writer",
+                "privileges": [ { "resource": { "db": "catalog", "collection": "product" },
+                                  "actions": ["find", "insert", "update", "remove"] } ],
+                "roles": [] }
+      rollback:
+        - runCommand:
+            command: '{ "dropRole": "catalog_writer" }'
+  - changeSet:
+      id: dcl-roles-003
+      author: BrandowC
+      labels: "catalog,dcl,roles"
+      comment: "The domain grants its writing role to its own user (Annex J, J.7) and takes back the built-in readWrite the instance gave it, which also allows dropping collections and creating indexes."
+      changes:
+        - runCommand:
+            command: '{ "grantRolesToUser": "catalog_app", "roles": [ { "role": "catalog_writer", "db": "catalog" } ] }'
+        - runCommand:
+            command: '{ "revokeRolesFromUser": "catalog_app", "roles": [ { "role": "readWrite", "db": "catalog" } ] }'
+      rollback:
+        - runCommand:
+            command: '{ "grantRolesToUser": "catalog_app", "roles": [ { "role": "readWrite", "db": "catalog" } ] }'
+        - runCommand:
+            command: '{ "revokeRolesFromUser": "catalog_app", "roles": [ { "role": "catalog_writer", "db": "catalog" } ] }'

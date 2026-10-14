@@ -1,0 +1,2 @@
+# Evolving a validator is a new changeset with collMod, never an edit of an applied one.
+databaseChangeLog: []
